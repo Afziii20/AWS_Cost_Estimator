@@ -4,7 +4,6 @@ A dual-interface cloud cost estimation tool — a polished **CLI** for terminal 
 
 ![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue?style=flat-square)
 ![No dependencies](https://img.shields.io/badge/dependencies-none-green?style=flat-square)
-![License MIT](https://img.shields.io/badge/license-MIT-orange?style=flat-square)
 
 ---
 
@@ -140,8 +139,3 @@ Planned additions: ECS/EKS node groups, ElastiCache, API Gateway, SQS/SNS.
 
 Estimates are based on us-east-1 on-demand rates unless specified. Actual AWS costs depend on exact usage patterns, Reserved Instance commitments, Savings Plans, and regional pricing variations. Always verify with the [official AWS Pricing Calculator](https://calculator.aws).
 
----
-
-## License
-
-MIT
