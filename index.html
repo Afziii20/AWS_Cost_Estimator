@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWS Cloud Cost Estimator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0e17;
+    --surface: #111827;
+    --surface2: #1a2332;
+    --border: #1e3a5f;
+    --border-light: #2a4a70;
+    --accent: #0ea5e9;
+    --accent-dim: rgba(14,165,233,0.12);
+    --accent-glow: rgba(14,165,233,0.25);
+    --green: #10b981;
+    --green-dim: rgba(16,185,129,0.12);
+    --yellow: #f59e0b;
+    --yellow-dim: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.1);
+    --text: #e2e8f0;
+    --text-dim: #64748b;
+    --text-mid: #94a3b8;
+    --font-sans: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --radius: 6px;
+    --radius-lg: 10px;
+    --transition: 0.15s ease;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* Scanline effect */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* Header */
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(10,14,23,0.95);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+  }
+  .logo {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo::before {
+    content: '';
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--accent);
+    animation: pulse 2s ease infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+  .header-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  /* Layout */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 0;
+    min-height: calc(100vh - 56px);
+  }
+
+  .left-panel {
+    padding: 28px 32px;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+
+  .right-panel {
+    padding: 28px 24px;
+    position: sticky;
+    top: 56px;
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+    background: var(--surface);
+  }
+
+  /* Section headers */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-mid);
+  }
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Arch name row */
+  .arch-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  /* Form elements */
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  input, select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    -webkit-appearance: none;
+  }
+  input:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  input[type="number"] { -moz-appearance: textfield; }
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2364748b'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+
+  /* Service cards */
+  .service-section {
+    margin-bottom: 28px;
+  }
+
+  .service-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin-bottom: 10px;
+    position: relative;
+    transition: border-color var(--transition);
+  }
+  .service-card:hover { border-color: var(--border-light); }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .card-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+  }
+  .tag-ec2    { background: var(--accent-dim);  color: var(--accent);  border: 1px solid rgba(14,165,233,0.3); }
+  .tag-rds    { background: var(--yellow-dim);  color: var(--yellow);  border: 1px solid rgba(245,158,11,0.3); }
+  .tag-s3     { background: var(--green-dim);   color: var(--green);   border: 1px solid rgba(16,185,129,0.3); }
+  .tag-lambda { background: rgba(168,85,247,0.1); color: #a855f7; border: 1px solid rgba(168,85,247,0.3); }
+  .tag-cf     { background: rgba(249,115,22,0.1); color: #f97316; border: 1px solid rgba(249,115,22,0.3); }
+
+  .card-cost {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--green);
+  }
+
+  .card-remove {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1;
+    transition: color var(--transition), background var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+  }
+  .card-remove:hover { color: var(--red); background: var(--red-dim); }
+
+  .card-grid {
+    display: grid;
+    gap: 10px;
+  }
+  .card-grid.two { grid-template-columns: 1fr 1fr; }
+  .card-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+  .card-grid.four { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  /* Toggle switch */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .toggle {
+    width: 36px; height: 20px;
+    background: var(--border);
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    border: none;
+    flex-shrink: 0;
+    transition: background var(--transition);
+  }
+  .toggle.on { background: var(--green); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 14px; height: 14px;
+    background: white;
+    border-radius: 50%;
+    transition: transform var(--transition);
+  }
+  .toggle.on::after { transform: translateX(16px); }
+  .toggle-label { font-size: 12px; color: var(--text-mid); }
+
+  /* Add buttons */
+  .add-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+  .btn-add {
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--text-mid);
+    border-radius: var(--radius);
+    padding: 7px 14px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .btn-add .icon { font-size: 14px; }
+
+  /* Right panel: estimate */
+  .estimate-header {
+    margin-bottom: 20px;
+  }
+  .estimate-title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .estimate-total {
+    font-family: var(--font-mono);
+    font-size: 32px;
+    font-weight: 500;
+    color: var(--green);
+    line-height: 1;
+  }
+  .estimate-total .currency { font-size: 18px; color: var(--text-mid); margin-right: 2px; }
+  .estimate-annual {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    font-family: var(--font-mono);
+  }
+
+  /* Bar chart */
+  .bars {
+    margin: 20px 0;
+  }
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .bar-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-mid);
+    width: 72px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .bar-cost {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    width: 60px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* Line items */
+  .line-items {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-top: 16px;
+  }
+  .line-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .line-item:last-child { border-bottom: none; }
+  .line-item-left { flex: 1; min-width: 0; }
+  .line-item-name {
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .line-item-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .line-item-cost {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--green);
+    flex-shrink: 0;
+  }
+
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    background: var(--surface2);
+    border-top: 1px solid var(--border-light);
+    margin-top: 4px;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+  .total-label { font-size: 12px; font-weight: 600; color: var(--text); }
+  .total-value { font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--green); }
+
+  /* Export button */
+  .btn-export {
+    width: 100%;
+    margin-top: 16px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(14,165,233,0.4);
+    color: var(--accent);
+    border-radius: var(--radius);
+    padding: 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+  .btn-export:hover { background: rgba(14,165,233,0.2); border-color: var(--accent); }
+
+  .disclaimer {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 14px;
+    padding: 10px;
+    background: var(--yellow-dim);
+    border: 1px solid rgba(245,158,11,0.2);
+    border-radius: var(--radius);
+    line-height: 1.5;
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+  .empty-icon { font-size: 32px; margin-bottom: 10px; opacity: 0.4; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+    .right-panel { position: static; height: auto; border-top: 1px solid var(--border); }
+    .card-grid.four { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 600px) {
+    .left-panel, .right-panel { padding: 20px 16px; }
+    .header { padding: 0 16px; }
+    .card-grid.two, .card-grid.three { grid-template-columns: 1fr; }
+    .arch-meta { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">AWS COST ESTIMATOR</div>
+  <span class="header-tag">us-east-1 · on-demand pricing</span>
+</header>
+
+<main class="main">
+
+  <!-- Left: Builder -->
+  <div class="left-panel">
+
+    <!-- Architecture metadata -->
+    <div class="section-header">
+      <span class="section-title">Architecture</span>
+      <div class="section-line"></div>
+    </div>
+    <div class="arch-meta">
+      <div>
+        <label>Name</label>
+        <input type="text" id="arch-name" value="My Web Application" oninput="recalculate()">
+      </div>
+      <div>
+        <label>Region</label>
+        <select id="arch-region" onchange="recalculate()">
+          <option value="us-east-1">us-east-1 (N. Virginia)</option>
+          <option value="us-west-2">us-west-2 (Oregon)</option>
+          <option value="eu-west-1">eu-west-1 (Ireland)</option>
+          <option value="ap-south-1">ap-south-1 (Mumbai)</option>
+          <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Components -->
+    <div id="components-container"></div>
+
+    <!-- Add service buttons -->
+    <div class="section-header">
+      <span class="section-title">Add Service</span>
+      <div class="section-line"></div>
+    </div>
+    <div class="add-buttons">
+      <button class="btn-add" onclick="addEC2()"><span class="icon">⊕</span> EC2 Instance</button>
+      <button class="btn-add" onclick="addRDS()"><span class="icon">⊕</span> RDS Database</button>
+      <button class="btn-add" onclick="addS3()"><span class="icon">⊕</span> S3 Bucket</button>
+      <button class="btn-add" onclick="addLambda()"><span class="icon">⊕</span> Lambda</button>
+      <button class="btn-add" onclick="addCloudFront()"><span class="icon">⊕</span> CloudFront</button>
+    </div>
+
+    <!-- Data transfer -->
+    <div class="section-header">
+      <span class="section-title">Data Transfer</span>
+      <div class="section-line"></div>
+    </div>
+    <div class="service-card">
+      <div class="card-grid two">
+        <div>
+          <label>Egress to internet (GB/mo)</label>
+          <input type="number" id="dt-egress" value="0" min="0" oninput="recalculate()">
+        </div>
+        <div>
+          <label>Estimated cost</label>
+          <input type="text" id="dt-cost" value="$0.00" readonly style="color:var(--green);cursor:default;">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right: Estimate -->
+  <div class="right-panel">
+    <div class="estimate-header">
+      <div class="estimate-title">Monthly Estimate</div>
+      <div class="estimate-total"><span class="currency">$</span><span id="total-monthly">0.00</span></div>
+      <div class="estimate-annual" id="total-annual">$0.00 / year</div>
+    </div>
+
+    <div id="bars-container" class="bars"></div>
+    <div id="lineitems-container"></div>
+
+    <button class="btn-export" onclick="exportJSON()">↓ Export as JSON</button>
+
+    <div class="disclaimer">
+      ⚠ Estimates use us-east-1 on-demand rates. Actual costs vary by usage, data transfer, and region. Always verify with the official <a href="https://calculator.aws" style="color:var(--yellow)" target="_blank">AWS Calculator</a>.
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─── Pricing data ───────────────────────────────────────────────────────────
+const EC2_PRICES = {
+  "t3.micro":    [0.0104, 0.0066],  "t3.small":    [0.0208, 0.0132],
+  "t3.medium":   [0.0416, 0.0264],  "t3.large":    [0.0832, 0.0528],
+  "t3.xlarge":   [0.1664, 0.1056],  "t3.2xlarge":  [0.3328, 0.2112],
+  "m6i.large":   [0.0960, 0.0610],  "m6i.xlarge":  [0.1920, 0.1220],
+  "m6i.2xlarge": [0.3840, 0.2440],  "m6i.4xlarge": [0.7680, 0.4880],
+  "c6i.large":   [0.0850, 0.0540],  "c6i.xlarge":  [0.1700, 0.1080],
+  "c6i.2xlarge": [0.3400, 0.2160],
+  "r6i.large":   [0.1260, 0.0800],  "r6i.xlarge":  [0.2520, 0.1600],
+};
+const RDS_PRICES = {
+  "db.t3.micro":   [0.0170, 0.0340],  "db.t3.small":   [0.0340, 0.0680],
+  "db.t3.medium":  [0.0680, 0.1360],  "db.t3.large":   [0.1360, 0.2720],
+  "db.m6g.large":  [0.1620, 0.3240],  "db.m6g.xlarge": [0.3240, 0.6480],
+  "db.r6g.large":  [0.2400, 0.4800],  "db.r6g.xlarge": [0.4800, 0.9600],
+};
+const S3_PRICES = {
+  "Standard": 0.023,  "Standard-IA": 0.0125,  "One Zone-IA": 0.010,
+  "Glacier Instant": 0.004,  "Glacier Flexible": 0.0036,
+};
+const HOURS = 730;
+const SERVICE_COLORS = {
+  EC2: "#0ea5e9", RDS: "#f59e0b", S3: "#10b981",
+  Lambda: "#a855f7", CloudFront: "#f97316", "Data Transfer": "#64748b"
+};
+
+// ─── State ──────────────────────────────────────────────────────────────────
+let components = [];
+let nextId = 1;
+
+function uid() { return nextId++; }
+
+// ─── Component constructors ──────────────────────────────────────────────────
+function addEC2() {
+  const id = uid();
+  components.push({ id, type: "EC2", instance: "t3.medium", count: 1, hours: 730, model: "on-demand" });
+  render(); recalculate();
+}
+function addRDS() {
+  const id = uid();
+  components.push({ id, type: "RDS", instance: "db.t3.medium", engine: "PostgreSQL", multiAZ: false, storage: 100 });
+  render(); recalculate();
+}
+function addS3() {
+  const id = uid();
+  components.push({ id, type: "S3", storage: 100, storageClass: "Standard", gets: 0, puts: 0, transfer: 0 });
+  render(); recalculate();
+}
+function addLambda() {
+  const id = uid();
+  components.push({ id, type: "Lambda", invocations: 1000000, duration: 200, memory: 128 });
+  render(); recalculate();
+}
+function addCloudFront() {
+  const id = uid();
+  components.push({ id, type: "CloudFront", transfer: 100, requests: 1000000 });
+  render(); recalculate();
+}
+function removeComponent(id) {
+  components = components.filter(c => c.id !== id);
+  render(); recalculate();
+}
+
+// ─── Sync form → state ───────────────────────────────────────────────────────
+function syncField(id, field, value, isNum = true) {
+  const comp = components.find(c => c.id === id);
+  if (!comp) return;
+  comp[field] = isNum ? (parseFloat(value) || 0) : value;
+  recalculate();
+}
+function syncToggle(id, field, el) {
+  const comp = components.find(c => c.id === id);
+  if (!comp) return;
+  comp[field] = !comp[field];
+  el.classList.toggle('on', comp[field]);
+  recalculate();
+}
+
+// ─── Render cards ────────────────────────────────────────────────────────────
+function cardCost(comp) {
+  const costs = computeComponentCost(comp);
+  return costs.monthly;
+}
+
+function render() {
+  const container = document.getElementById('components-container');
+  if (components.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">☁</div>
+        Add services below to start estimating
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = components.map(comp => {
+    const cost = cardCost(comp);
+    const costStr = `$${cost.toFixed(2)}/mo`;
+    const tag = `<span class="card-tag tag-${comp.type.toLowerCase().replace('cloudfront','cf')}">${comp.type}</span>`;
+
+    if (comp.type === "EC2") return `
+      <div class="service-card" id="card-${comp.id}">
+        <div class="card-header">
+          ${tag}
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="card-cost">${costStr}</span>
+            <button class="card-remove" onclick="removeComponent(${comp.id})">×</button>
+          </div>
+        </div>
+        <div class="card-grid four">
+          <div>
+            <label>Instance type</label>
+            <select onchange="syncField(${comp.id},'instance',this.value,false);render()">
+              ${Object.keys(EC2_PRICES).map(t => `<option ${t===comp.instance?'selected':''}>${t}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Count</label>
+            <input type="number" min="1" value="${comp.count}" oninput="syncField(${comp.id},'count',this.value)">
+          </div>
+          <div>
+            <label>Hours/month</label>
+            <input type="number" min="1" max="744" value="${comp.hours}" oninput="syncField(${comp.id},'hours',this.value)">
+          </div>
+          <div>
+            <label>Pricing</label>
+            <select onchange="syncField(${comp.id},'model',this.value,false);render()">
+              <option ${comp.model==='on-demand'?'selected':''}>on-demand</option>
+              <option value="reserved-1yr" ${comp.model==='reserved-1yr'?'selected':''}>reserved-1yr</option>
+            </select>
+          </div>
+        </div>
+      </div>`;
+
+    if (comp.type === "RDS") return `
+      <div class="service-card" id="card-${comp.id}">
+        <div class="card-header">
+          ${tag}
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="card-cost">${costStr}</span>
+            <button class="card-remove" onclick="removeComponent(${comp.id})">×</button>
+          </div>
+        </div>
+        <div class="card-grid four">
+          <div>
+            <label>Instance class</label>
+            <select onchange="syncField(${comp.id},'instance',this.value,false);render()">
+              ${Object.keys(RDS_PRICES).map(t => `<option ${t===comp.instance?'selected':''}>${t}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Engine</label>
+            <select onchange="syncField(${comp.id},'engine',this.value,false)">
+              ${['MySQL','PostgreSQL','Aurora MySQL','MariaDB'].map(e=>`<option ${e===comp.engine?'selected':''}>${e}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Storage GB</label>
+            <input type="number" min="20" value="${comp.storage}" oninput="syncField(${comp.id},'storage',this.value)">
+          </div>
+          <div>
+            <label>Multi-AZ</label>
+            <div class="toggle-row" style="margin-top:8px">
+              <button class="toggle ${comp.multiAZ?'on':''}" onclick="syncToggle(${comp.id},'multiAZ',this);render()"></button>
+              <span class="toggle-label">${comp.multiAZ ? 'Enabled' : 'Disabled'}</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    if (comp.type === "S3") return `
+      <div class="service-card" id="card-${comp.id}">
+        <div class="card-header">
+          ${tag}
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="card-cost">${costStr}</span>
+            <button class="card-remove" onclick="removeComponent(${comp.id})">×</button>
+          </div>
+        </div>
+        <div class="card-grid three" style="margin-bottom:10px">
+          <div>
+            <label>Storage class</label>
+            <select onchange="syncField(${comp.id},'storageClass',this.value,false);render()">
+              ${Object.keys(S3_PRICES).map(c=>`<option ${c===comp.storageClass?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Storage GB</label>
+            <input type="number" min="0" value="${comp.storage}" oninput="syncField(${comp.id},'storage',this.value)">
+          </div>
+          <div>
+            <label>Egress GB/mo</label>
+            <input type="number" min="0" value="${comp.transfer}" oninput="syncField(${comp.id},'transfer',this.value)">
+          </div>
+        </div>
+        <div class="card-grid two">
+          <div>
+            <label>GET requests/mo</label>
+            <input type="number" min="0" value="${comp.gets}" oninput="syncField(${comp.id},'gets',this.value)">
+          </div>
+          <div>
+            <label>PUT requests/mo</label>
+            <input type="number" min="0" value="${comp.puts}" oninput="syncField(${comp.id},'puts',this.value)">
+          </div>
+        </div>
+      </div>`;
+
+    if (comp.type === "Lambda") return `
+      <div class="service-card" id="card-${comp.id}">
+        <div class="card-header">
+          ${tag}
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="card-cost">${costStr}</span>
+            <button class="card-remove" onclick="removeComponent(${comp.id})">×</button>
+          </div>
+        </div>
+        <div class="card-grid three">
+          <div>
+            <label>Invocations/mo</label>
+            <input type="number" min="0" value="${comp.invocations}" oninput="syncField(${comp.id},'invocations',this.value)">
+          </div>
+          <div>
+            <label>Avg duration ms</label>
+            <input type="number" min="1" max="900000" value="${comp.duration}" oninput="syncField(${comp.id},'duration',this.value)">
+          </div>
+          <div>
+            <label>Memory MB</label>
+            <select onchange="syncField(${comp.id},'memory',this.value);render()">
+              ${[128,256,512,1024,2048,3008,10240].map(m=>`<option value="${m}" ${m===comp.memory?'selected':''}>${m} MB</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>`;
+
+    if (comp.type === "CloudFront") return `
+      <div class="service-card" id="card-${comp.id}">
+        <div class="card-header">
+          ${tag}
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="card-cost">${costStr}</span>
+            <button class="card-remove" onclick="removeComponent(${comp.id})">×</button>
+          </div>
+        </div>
+        <div class="card-grid two">
+          <div>
+            <label>Data transfer GB/mo</label>
+            <input type="number" min="0" value="${comp.transfer}" oninput="syncField(${comp.id},'transfer',this.value)">
+          </div>
+          <div>
+            <label>HTTPS requests/mo</label>
+            <input type="number" min="0" value="${comp.requests}" oninput="syncField(${comp.id},'requests',this.value)">
+          </div>
+        </div>
+      </div>`;
+
+    return '';
+  }).join('');
+}
+
+// ─── Cost computation ────────────────────────────────────────────────────────
+function computeComponentCost(comp) {
+  if (comp.type === "EC2") {
+    const [od, rv] = EC2_PRICES[comp.instance] || [0, 0];
+    const rate = comp.model === "reserved-1yr" ? rv : od;
+    return { monthly: rate * comp.hours * comp.count, service: "EC2", label: `${comp.count}× ${comp.instance}` };
+  }
+  if (comp.type === "RDS") {
+    const [single, multi] = RDS_PRICES[comp.instance] || [0, 0];
+    const rate = comp.multiAZ ? multi : single;
+    const instanceCost = rate * HOURS;
+    const storageCost = comp.storage * 0.115;
+    return { monthly: instanceCost + storageCost, service: "RDS", label: `${comp.instance} ${comp.engine}` };
+  }
+  if (comp.type === "S3") {
+    const rate = S3_PRICES[comp.storageClass] || 0.023;
+    let cost = comp.storage * rate;
+    cost += (comp.gets / 1000) * 0.0004;
+    cost += (comp.puts / 1000) * 0.005;
+    cost += comp.transfer * 0.09;
+    return { monthly: cost, service: "S3", label: `${comp.storage}GB ${comp.storageClass}` };
+  }
+  if (comp.type === "Lambda") {
+    const reqCost = Math.max(0, ((comp.invocations - 1000000) / 1e6) * 0.20);
+    const gbSec = comp.invocations * (comp.duration / 1000) * (comp.memory / 1024);
+    const computeCost = Math.max(0, (gbSec - 400000) * 0.0000166667);
+    return { monthly: reqCost + computeCost, service: "Lambda", label: `${(comp.invocations/1e6).toFixed(1)}M invocations` };
+  }
+  if (comp.type === "CloudFront") {
+    const cost = (comp.transfer * 0.0085) + ((comp.requests / 10000) * 0.010);
+    return { monthly: cost, service: "CloudFront", label: `${comp.transfer}GB CDN` };
+  }
+  return { monthly: 0, service: "Other", label: "" };
+}
+
+function computeDataTransfer(gb) {
+  if (gb <= 0) return 0;
+  if (gb <= 10240) return gb * 0.09;
+  if (gb <= 51200) return 10240 * 0.09 + (gb - 10240) * 0.085;
+  return 10240 * 0.09 + 40960 * 0.085 + (gb - 51200) * 0.07;
+}
+
+// ─── Recalculate & update right panel ────────────────────────────────────────
+function recalculate() {
+  const dtGb = parseFloat(document.getElementById('dt-egress').value) || 0;
+  const dtCost = computeDataTransfer(dtGb);
+  document.getElementById('dt-cost').value = `$${dtCost.toFixed(2)}`;
+
+  const results = components.map(comp => computeComponentCost(comp));
+  if (dtCost > 0) results.push({ monthly: dtCost, service: "Data Transfer", label: `${dtGb}GB egress` });
+
+  const byService = {};
+  results.forEach(r => {
+    byService[r.service] = (byService[r.service] || 0) + r.monthly;
+  });
+
+  const total = results.reduce((s, r) => s + r.monthly, 0);
+
+  document.getElementById('total-monthly').textContent = total.toFixed(2);
+  document.getElementById('total-annual').textContent = `$${(total * 12).toFixed(2)} / year`;
+
+  // Bar chart
+  const maxVal = Math.max(...Object.values(byService), 0.01);
+  const barsHTML = Object.entries(byService)
+    .sort((a, b) => b[1] - a[1])
+    .map(([svc, cost]) => {
+      const pct = (cost / maxVal * 100).toFixed(1);
+      const color = SERVICE_COLORS[svc] || "#64748b";
+      return `
+        <div class="bar-row">
+          <span class="bar-label">${svc}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <span class="bar-cost">$${cost.toFixed(2)}</span>
+        </div>`;
+    }).join('');
+  document.getElementById('bars-container').innerHTML = barsHTML;
+
+  // Line items
+  if (results.length === 0) {
+    document.getElementById('lineitems-container').innerHTML = '';
+    return;
+  }
+  const lineHTML = `
+    <div class="line-items">
+      ${results.map(r => `
+        <div class="line-item">
+          <div class="line-item-left">
+            <div class="line-item-name">${r.service}</div>
+            <div class="line-item-sub">${r.label}</div>
+          </div>
+          <div class="line-item-cost">$${r.monthly.toFixed(2)}</div>
+        </div>`).join('')}
+      <div class="total-row">
+        <span class="total-label">Total / month</span>
+        <span class="total-value">$${total.toFixed(2)}</span>
+      </div>
+    </div>`;
+  document.getElementById('lineitems-container').innerHTML = lineHTML;
+}
+
+// ─── Export ──────────────────────────────────────────────────────────────────
+function exportJSON() {
+  const dtGb = parseFloat(document.getElementById('dt-egress').value) || 0;
+  const dtCost = computeDataTransfer(dtGb);
+  const results = components.map(c => ({ ...computeComponentCost(c), id: c.id, config: c }));
+  const total = results.reduce((s, r) => s + r.monthly, 0) + dtCost;
+
+  const data = {
+    name: document.getElementById('arch-name').value,
+    region: document.getElementById('arch-region').value,
+    generated: new Date().toISOString(),
+    total_monthly: Math.round(total * 100) / 100,
+    total_annual: Math.round(total * 12 * 100) / 100,
+    components: results,
+    data_transfer: { gb: dtGb, monthly_cost: Math.round(dtCost * 100) / 100 }
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `aws-estimate-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+// Load a default 3-tier example
+components = [
+  { id: uid(), type: "EC2", instance: "t3.medium", count: 2, hours: 730, model: "on-demand" },
+  { id: uid(), type: "RDS", instance: "db.t3.medium", engine: "PostgreSQL", multiAZ: true, storage: 100 },
+  { id: uid(), type: "S3", storage: 500, storageClass: "Standard", gets: 5000000, puts: 500000, transfer: 50 },
+];
+render();
+recalculate();
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{
+  "_comment": "Typical 3-tier web application on AWS",
+  "name": "3-Tier Web App",
+  "region": "us-east-1",
+  "ec2": [
+    {
+      "instance_type": "t3.medium",
+      "count": 2,
+      "hours_per_month": 730,
+      "pricing_model": "on-demand",
+      "os": "Linux"
+    },
+    {
+      "instance_type": "t3.small",
+      "count": 1,
+      "hours_per_month": 730,
+      "pricing_model": "on-demand",
+      "os": "Linux"
+    }
+  ],
+  "rds": [
+    {
+      "instance_class": "db.t3.medium",
+      "engine": "PostgreSQL",
+      "count": 1,
+      "multi_az": true,
+      "storage_gb": 100,
+      "storage_class": "gp3"
+    }
+  ],
+  "s3": [
+    {
+      "storage_gb": 500,
+      "storage_class": "Standard",
+      "get_requests_monthly": 5000000,
+      "put_requests_monthly": 500000,
+      "data_transfer_out_gb": 50
+    }
+  ],
+  "lambda": [],
+  "cloudfront": [
+    {
+      "data_transfer_gb_per_month": 200,
+      "https_requests_per_month": 10000000
+    }
+  ],
+  "data_transfer_out_gb": 100
+}

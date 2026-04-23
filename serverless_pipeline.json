@@ -1,0 +1,30 @@
+{
+  "_comment": "Serverless data pipeline: API + Lambda + S3 + no EC2",
+  "name": "Serverless Data Pipeline",
+  "region": "us-east-1",
+  "ec2": [],
+  "rds": [],
+  "s3": [
+    {
+      "storage_gb": 2000,
+      "storage_class": "Standard-IA",
+      "get_requests_monthly": 1000000,
+      "put_requests_monthly": 2000000,
+      "data_transfer_out_gb": 20
+    }
+  ],
+  "lambda": [
+    {
+      "invocations_per_month": 10000000,
+      "avg_duration_ms": 500,
+      "memory_mb": 512
+    },
+    {
+      "invocations_per_month": 500000,
+      "avg_duration_ms": 3000,
+      "memory_mb": 1024
+    }
+  ],
+  "cloudfront": [],
+  "data_transfer_out_gb": 0
+}
